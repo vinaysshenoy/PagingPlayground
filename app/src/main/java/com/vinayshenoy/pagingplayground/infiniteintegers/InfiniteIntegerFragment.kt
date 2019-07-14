@@ -21,6 +21,10 @@ class InfiniteIntegerFragment : Fragment() {
 
   private val adapter = IntegerAdapter()
 
+  private val layoutManager: LinearLayoutManager by lazy(LazyThreadSafetyMode.NONE) {
+    integerList.layoutManager as LinearLayoutManager
+  }
+
   private val fetchExecutor = Executors.newSingleThreadExecutor()
 
   private val handler = Handler()
@@ -32,7 +36,7 @@ class InfiniteIntegerFragment : Fragment() {
   override fun onActivityCreated(savedInstanceState: Bundle?) {
     super.onActivityCreated(savedInstanceState)
     setupList()
-    setupDataSource()
+    setupDataSource(savedInstanceState)
   }
 
   private fun setupList() {
@@ -43,11 +47,24 @@ class InfiniteIntegerFragment : Fragment() {
     }
   }
 
-  private fun setupDataSource() {
+  private fun setupDataSource(savedInstanceState: Bundle?) {
+    val restoreStateRunnable = Runnable {
+      var alreadyRestored = false
+
+      val currentList = adapter.currentList
+      if(!alreadyRestored && currentList != null && savedInstanceState != null) {
+        val savedFirstVisibleItem = savedInstanceState.getInt("visible_item", 0)
+        if (savedFirstVisibleItem != 0) {
+          currentList.indexOf()
+        }
+        alreadyRestored = true
+      }
+    }
+
     disposable = Single
         .fromCallable { constructPagedList() }
         .subscribeOn(Schedulers.computation())
-        .subscribe { list -> adapter.submitList(list) }
+        .subscribe { list -> adapter.submitList(list, restoreStateRunnable) }
   }
 
   private fun constructPagedList(): PagedList<Int> {
@@ -57,10 +74,18 @@ class InfiniteIntegerFragment : Fragment() {
         .build()
 
     return PagedList
-        .Builder<Int, Int>(IntegerDataSource(), config)
+        .Builder(IntegerDataSource(), config)
         .setFetchExecutor(fetchExecutor)
         .setNotifyExecutor { handler.post(it) }
         .build()
+  }
+
+  override fun onSaveInstanceState(outState: Bundle) {
+    super.onSaveInstanceState(outState)
+    val firstVisibleItemIndex = layoutManager.findFirstVisibleItemPosition()
+    val firstVisibleItem: Int = adapter.currentList!![firstVisibleItemIndex]!!
+    println("wtf:saveinstancestate:visible item:$firstVisibleItem")
+    outState.putInt("visible_item", firstVisibleItem)
   }
 
   override fun onDestroyView() {
