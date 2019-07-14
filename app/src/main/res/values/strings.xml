@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Paging Playground</string>
+  <string name="infinite_integers">Infinite Integers</string>
 </resources>
